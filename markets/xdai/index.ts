@@ -21,11 +21,6 @@ export const XDAIConfig: IXDAIConfiguration = {
   ProviderId: 4,    // Unknown?
   ReservesConfig: {
     DAI: strategyDAI,
-    USDC: strategyUSDC,
-    USDT: strategyUSDT,
-    WBTC: strategyWBTC,
-    WETH: strategyWETH,
-    STAKE: strategySTAKE,
   },
   ReserveAssets: {
     [eXDaiNetwork.xdai]: {

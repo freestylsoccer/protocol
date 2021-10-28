@@ -1,0 +1,14 @@
+para probar los smart contracts
+  dir -> test-suites
+    el archivo principal es __setup.spec.ts
+
+anotaciones LendingPool
+  Returns the percentage of available liquidity that can be borrowed at once at stable rate
+  ** All % are 1e4 i.e. percentage plus two decimals
+  MAX_STABLE_RATE_BORROW_SIZE_PERCENT
+
+The borrowing is only enabled to an custody, that will tranfer the token when the requirements are correct.
+
+where is the interrest stored?
+how the users will withdrawl the interrest earned?
+create other pool where users can withdrawl the interrest earned  ñ

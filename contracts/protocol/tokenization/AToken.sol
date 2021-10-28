@@ -384,7 +384,8 @@ contract AToken is
     super._transfer(from, to, amount.rayDiv(index));
 
     if (validate) {
-      pool.finalizeTransfer(underlyingAsset, from, to, amount, fromBalanceBefore, toBalanceBefore);
+      // pool.finalizeTransfer(underlyingAsset, from, to, amount, fromBalanceBefore, toBalanceBefore);
+      pool.finalizeTransfer(underlyingAsset, from);
     }
 
     emit BalanceTransfer(from, to, amount, index);

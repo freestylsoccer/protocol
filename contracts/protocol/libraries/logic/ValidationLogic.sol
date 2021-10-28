@@ -39,11 +39,12 @@ library ValidationLogic {
    * @param amount The amount to be deposited
    */
   function validateDeposit(DataTypes.ReserveData storage reserve, uint256 amount) external view {
-    (bool isActive, bool isFrozen, , ) = reserve.configuration.getFlags();
+    (bool isActive, bool isFrozen, , , bool depositsEnabled) = reserve.configuration.getFlags();
 
     require(amount != 0, Errors.VL_INVALID_AMOUNT);
     require(isActive, Errors.VL_NO_ACTIVE_RESERVE);
     require(!isFrozen, Errors.VL_RESERVE_FROZEN);
+    require(depositsEnabled, Errors.VL_DESPOSITS_NOT_ENABLED);
   }
 
   /**
@@ -70,7 +71,7 @@ library ValidationLogic {
     require(amount != 0, Errors.VL_INVALID_AMOUNT);
     require(amount <= userBalance, Errors.VL_NOT_ENOUGH_AVAILABLE_USER_BALANCE);
 
-    (bool isActive, , , ) = reservesData[reserveAddress].configuration.getFlags();
+    (bool isActive, , , , ) = reservesData[reserveAddress].configuration.getFlags();
     require(isActive, Errors.VL_NO_ACTIVE_RESERVE);
 
     require(
@@ -133,7 +134,7 @@ library ValidationLogic {
   ) external view {
     ValidateBorrowLocalVars memory vars;
 
-    (vars.isActive, vars.isFrozen, vars.borrowingEnabled, vars.stableRateBorrowingEnabled) = reserve
+    (vars.isActive, vars.isFrozen, vars.borrowingEnabled, vars.stableRateBorrowingEnabled, ) = reserve
       .configuration
       .getFlags();
 
@@ -212,6 +213,59 @@ library ValidationLogic {
     }
   }
 
+  struct ValidateProjectBorrowLocalVars {
+    bool isActive;
+    bool isFrozen;
+    bool borrowingEnabled;
+    bool stableRateBorrowingEnabled;
+  }
+
+  /**
+   * @dev Validates a borrow action
+   * @param asset The address of the asset to borrow
+   * @param reserve The reserve state from which the user is borrowing
+   * @param userAddress The address of the user
+   * @param amount The amount to be borrowed
+   * @param interestRateMode The interest rate mode at which the user is borrowing
+   * @param projectBorrower The address of the project borrower
+   * @param emergencyAdmin The addresses of emergency admin
+   */
+
+  function validateProjectBorrow(
+    address asset,
+    DataTypes.ReserveData storage reserve,
+    address userAddress,
+    uint256 amount,
+    uint256 interestRateMode,
+    address projectBorrower,
+    address emergencyAdmin
+  ) external view {
+    ValidateProjectBorrowLocalVars memory vars;
+
+    (vars.isActive, vars.isFrozen, vars.borrowingEnabled, vars.stableRateBorrowingEnabled, ) = reserve
+      .configuration
+      .getFlags();
+
+    require(vars.isActive, Errors.VL_NO_ACTIVE_RESERVE);
+    require(!vars.isFrozen, Errors.VL_RESERVE_FROZEN);
+    require(amount != 0, Errors.VL_INVALID_AMOUNT);
+    // only project benefactor or emergency admin can borrow
+    require(userAddress == projectBorrower || userAddress == emergencyAdmin, "Only project borrower");
+
+    require(vars.borrowingEnabled, Errors.VL_BORROWING_NOT_ENABLED);
+
+    //validate interest rate mode only stable borrow is enabled for reserves
+    require(
+      uint256(DataTypes.InterestRateMode.STABLE) == interestRateMode,
+      Errors.VL_INVALID_INTEREST_RATE_MODE_SELECTED
+    );
+
+    if (interestRateMode == uint256(DataTypes.InterestRateMode.STABLE)) {
+      //check if the borrow mode is stable and if stable rate borrowing is enabled on this reserve
+      require(vars.stableRateBorrowingEnabled, Errors.VL_STABLE_BORROWING_NOT_ENABLED);
+    }
+  }
+
   /**
    * @dev Validates a repay action
    * @param reserve The reserve state from which the user is repaying
@@ -263,7 +317,7 @@ library ValidationLogic {
     uint256 variableDebt,
     DataTypes.InterestRateMode currentRateMode
   ) external view {
-    (bool isActive, bool isFrozen, , bool stableRateEnabled) = reserve.configuration.getFlags();
+    (bool isActive, bool isFrozen, , bool stableRateEnabled, ) = reserve.configuration.getFlags();
 
     require(isActive, Errors.VL_NO_ACTIVE_RESERVE);
     require(!isFrozen, Errors.VL_RESERVE_FROZEN);
@@ -307,7 +361,7 @@ library ValidationLogic {
     IERC20 variableDebtToken,
     address aTokenAddress
   ) external view {
-    (bool isActive, , , ) = reserve.configuration.getFlags();
+    (bool isActive, , , ,) = reserve.configuration.getFlags();
 
     require(isActive, Errors.VL_NO_ACTIVE_RESERVE);
 

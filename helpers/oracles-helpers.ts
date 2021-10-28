@@ -24,7 +24,12 @@ export const setInitialMarketRatesInRatesOracleByHelper = async (
   const assetAddresses: string[] = [];
   const borrowRates: string[] = [];
   const symbols: string[] = [];
-  for (const [assetSymbol, { borrowRate }] of Object.entries(marketRates) as [
+  const marketRates2 = {
+    DAI: { borrowRate: '39000000000000000000000000' },
+    TUSD: { borrowRate: '35000000000000000000000000' },
+    AAVE: { borrowRate: '30000000000000000000000000' }
+  }
+  for (const [assetSymbol, { borrowRate }] of Object.entries(marketRates2) as [
     string,
     IMarketRates
   ][]) {
@@ -71,7 +76,12 @@ export const setInitialAssetPricesInOracle = async (
   assetsAddresses: iAssetBase<tEthereumAddress>,
   priceOracleInstance: PriceOracle
 ) => {
-  for (const [assetSymbol, price] of Object.entries(prices) as [string, string][]) {
+  const prices2 = {
+    AAVE: '3620948469000000',
+    DAI: '3690684128600000',
+    TUSD: '3647141364160000',
+  }
+  for (const [assetSymbol, price] of Object.entries(prices2) as [string, string][]) {
     const assetAddressIndex = Object.keys(assetsAddresses).findIndex(
       (value) => value === assetSymbol
     );

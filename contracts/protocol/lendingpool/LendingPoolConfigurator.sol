@@ -179,7 +179,7 @@ contract LendingPoolConfigurator is VersionedInitializable, ILendingPoolConfigur
     ILendingPool cachedPool = pool;
 
     DataTypes.ReserveData memory reserveData = cachedPool.getReserveData(input.asset);
-     
+
     (, , , uint256 decimals, ) = cachedPool.getConfiguration(input.asset).getParamsMemory();
 
     bytes memory encodedCall = abi.encodeWithSelector(
@@ -483,5 +483,21 @@ contract LendingPoolConfigurator is VersionedInitializable, ILendingPoolConfigur
       availableLiquidity == 0 && reserveData.currentLiquidityRate == 0,
       Errors.LPC_RESERVE_LIQUIDITY_NOT_0
     );
+  }
+
+  function updateReserveRates(
+    address asset,
+    uint128 newLiquidityRate,
+    uint128 newLiquidityStableRate,
+    uint128 newLiquidityVariableRate
+    ) external onlyPoolAdmin {
+      pool.updateInterestRates(asset, newLiquidityRate, newLiquidityStableRate, newLiquidityVariableRate);
+  }
+
+  function updateProjectBorrower(
+    address asset,
+    address borrower
+  ) external onlyPoolAdmin {
+    pool.updateProjectBorrower(asset, borrower);
   }
 }

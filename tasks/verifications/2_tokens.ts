@@ -34,9 +34,15 @@ task('verify:tokens', 'Deploy oracles for dev enviroment')
       await addressesProvider.getLendingPoolConfigurator(),
       await getFirstSigner()
     );
+    const otherReserveAssets =
+    {
+      DAI: '0x9A2831a33E3fFa804E269E9b75a837B50F9A2C20',
+      AAVE: '0xFce6F251b7E541138c4C4210427ac19b37c90226',
+      TUSD: '0xde3139705d623A6feC95010D863e3b5Ff061513a'
+    }
 
     const configs = Object.entries(ReservesConfig) as [string, IReserveParams][];
-    for (const entry of Object.entries(getParamPerNetwork(ReserveAssets, network))) {
+    for (const entry of Object.entries(otherReserveAssets)) {
       const [token, tokenAddress] = entry;
       console.log(`- Verifying ${token} token related contracts`);
       const {

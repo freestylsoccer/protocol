@@ -59,11 +59,12 @@ task('verify:general', 'Verify contracts at Etherscan')
     const lendingPoolCollateralManagerProxy = await getProxy(lendingPoolCollateralManagerAddress);
 
     if (all) {
+      /*
       const lendingPoolImplAddress = getParamPerNetwork(LendingPool, network);
       const lendingPoolImpl = notFalsyOrZeroAddress(lendingPoolImplAddress)
         ? await getLendingPoolImpl(lendingPoolImplAddress)
         : await getLendingPoolImpl();
-
+      */
       const lendingPoolConfiguratorImplAddress = getParamPerNetwork(
         LendingPoolConfigurator,
         network
@@ -71,7 +72,7 @@ task('verify:general', 'Verify contracts at Etherscan')
       const lendingPoolConfiguratorImpl = notFalsyOrZeroAddress(lendingPoolConfiguratorImplAddress)
         ? await getLendingPoolConfiguratorImpl(lendingPoolConfiguratorImplAddress)
         : await getLendingPoolConfiguratorImpl();
-
+      /*
       const lendingPoolCollateralManagerImplAddress = getParamPerNetwork(
         LendingPoolCollateralManager,
         network
@@ -105,11 +106,12 @@ task('verify:general', 'Verify contracts at Etherscan')
       // Lending Pool implementation
       console.log('\n- Verifying LendingPool Implementation...\n');
       await verifyContract(eContractid.LendingPool, lendingPoolImpl, []);
-
+      */
       // Lending Pool Configurator implementation
       console.log('\n- Verifying LendingPool Configurator Implementation...\n');
       await verifyContract(eContractid.LendingPoolConfigurator, lendingPoolConfiguratorImpl, []);
 
+      /*
       // Lending Pool Collateral Manager implementation
       console.log('\n- Verifying LendingPool Collateral Manager Implementation...\n');
       await verifyContract(
@@ -133,7 +135,9 @@ task('verify:general', 'Verify contracts at Etherscan')
       await verifyContract(eContractid.WETHGateway, wethGateway, [
         await getWrappedNativeTokenAddress(poolConfig),
       ]);
+      */
     }
+    /*
     // Lending Pool proxy
     console.log('\n- Verifying  Lending Pool Proxy...\n');
     await verifyContract(eContractid.InitializableAdminUpgradeabilityProxy, lendingPoolProxy, [
@@ -154,7 +158,7 @@ task('verify:general', 'Verify contracts at Etherscan')
       eContractid.InitializableAdminUpgradeabilityProxy,
       lendingPoolCollateralManagerProxy,
       []
-    );
+    );*/
 
     console.log('Finished verifications.');
   });

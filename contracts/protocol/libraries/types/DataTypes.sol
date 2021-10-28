@@ -23,6 +23,14 @@ library DataTypes {
     address variableDebtTokenAddress;
     //address of the interest rate strategy
     address interestRateStrategyAddress;
+    //project borrower of the project
+    address projectBorrower;
+    //the project start date
+    uint40 projectStartTimestamp;
+    //the date until the withdrawals will be allowed
+    uint40 projectEndTimestamp;
+    //interrest token
+    address bTokenAddress;
     //the id of the reserve. Represents the position in the list of the active reserves
     uint8 id;
   }
@@ -38,6 +46,7 @@ library DataTypes {
     //bit 59: stable rate borrowing enabled
     //bit 60-63: reserved
     //bit 64-79: reserve factor
+    //bit 80: deposit is enabled
     uint256 data;
   }
 

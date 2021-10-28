@@ -120,11 +120,18 @@ contract WETHGateway is IWETHGateway, Ownable {
     uint256 interesRateMode,
     uint16 referralCode
   ) external override {
+    /*
     ILendingPool(lendingPool).borrow(
       address(WETH),
       amount,
       interesRateMode,
       referralCode,
+      msg.sender
+    );
+    */
+    ILendingPool(lendingPool).borrow(
+      address(WETH),
+      amount,
       msg.sender
     );
     WETH.withdraw(amount);

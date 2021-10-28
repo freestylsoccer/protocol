@@ -55,7 +55,8 @@ task('dev:initialize-lending-pool', 'Initialize lending pool configuration.')
 
     const admin = await addressesProvider.getPoolAdmin();
 
-    const treasuryAddress = await getTreasuryAddress(poolConfig);
+    // const treasuryAddress = await getTreasuryAddress(poolConfig);
+    const treasuryAddress = '0x464c71f6c2f760dda6093dcb91c24c39e5d6e18c';
 
     await initReservesByHelper(
       ReservesConfig,

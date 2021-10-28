@@ -20,13 +20,8 @@ export const AvalancheConfig: IAvalancheConfiguration = {
   MarketId: 'Avalanche market',
   ProviderId: 4,
   ReservesConfig: {
-    WETH: strategyWETH,
     DAI: strategyDAI,
-    USDT: strategyUSDT,
-    USDC: strategyUSDC,
     AAVE: strategyAAVE,
-    WBTC: strategyWBTC,
-    WAVAX: strategyWAVAX,
   },
   ReserveAssets: {
     [eAvalancheNetwork.avalanche]: {

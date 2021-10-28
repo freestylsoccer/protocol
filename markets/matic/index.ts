@@ -21,11 +21,6 @@ export const MaticConfig: IMaticConfiguration = {
   ProviderId: 3,
   ReservesConfig: {
     DAI: strategyDAI,
-    USDC: strategyUSDC,
-    USDT: strategyUSDT,
-    WBTC: strategyWBTC,
-    WETH: strategyWETH,
-    WMATIC: strategyMATIC,
     AAVE: strategyAAVE,
   },
   ReserveAssets: {

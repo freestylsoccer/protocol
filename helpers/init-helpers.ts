@@ -66,6 +66,7 @@ export const initReservesByHelper = async (
     variableDebtTokenSymbol: string;
     stableDebtTokenName: string;
     stableDebtTokenSymbol: string;
+    projectBorrower: string;
     params: string;
   }[] = [];
 
@@ -142,6 +143,7 @@ export const initReservesByHelper = async (
       variableDebtTokenSymbol: `variableDebt${symbolPrefix}${symbol}`,
       stableDebtTokenName: `${stableDebtTokenNamePrefix} ${symbol}`,
       stableDebtTokenSymbol: `stableDebt${symbolPrefix}${symbol}`,
+      projectBorrower: "0x2c5CeF061409B80e48b6e9cCc636Ebe58023d1A9",
       params: await getATokenExtraParams(aTokenImpl, tokenAddresses[symbol]),
     });
   }

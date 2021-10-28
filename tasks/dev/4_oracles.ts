@@ -45,11 +45,18 @@ task('dev:deploy-oracles', 'Deploy oracles for dev environment')
     const addressesProvider = await getLendingPoolAddressesProvider();
     const admin = await addressesProvider.getPoolAdmin();
 
+    const initialPrices2 = {
+      AAVE: '3620948469000000',
+      DAI: '3690684128600000',
+      TUSD: '3647141364160000',
+      USD: '5848466240000000'
+    }
+
     const fallbackOracle = await deployPriceOracle(verify);
     await waitForTx(await fallbackOracle.setEthUsdPrice(MockUsdPriceInWei));
     await setInitialAssetPricesInOracle(AllAssetsInitialPrices, mockTokensAddress, fallbackOracle);
 
-    const mockAggregators = await deployAllMockAggregators(AllAssetsInitialPrices, verify);
+    const mockAggregators = await deployAllMockAggregators(initialPrices2, verify);
 
     const allTokenAddresses = getAllTokenAddresses(mockTokens);
     const allAggregatorsAddresses = getAllAggregatorsAddresses(mockAggregators);

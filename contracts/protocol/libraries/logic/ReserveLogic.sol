@@ -248,6 +248,47 @@ library ReserveLogic {
     );
   }
 
+  /**
+   * @dev Updates the reserve current stable borrow rate, the current variable borrow rate and the current liquidity rate
+   * @param reserve The address of the reserve to be updated
+   * @param liquidityRate The new liquidity rate
+   * @param liquidityStableRate The new liquidity stable rate
+   * @param liquidityVariableRate The new liquidity variable rate
+   **/
+  function updateProjectInterestRates(
+    DataTypes.ReserveData storage reserve,
+    address reserveAddress,
+    uint128 liquidityRate,
+    uint128 liquidityStableRate,
+    uint128 liquidityVariableRate
+  ) internal {
+
+    require(liquidityRate <= type(uint128).max, Errors.RL_LIQUIDITY_RATE_OVERFLOW);
+    require(liquidityStableRate <= type(uint128).max, Errors.RL_STABLE_BORROW_RATE_OVERFLOW);
+    require(liquidityVariableRate <= type(uint128).max, Errors.RL_VARIABLE_BORROW_RATE_OVERFLOW);
+
+    reserve.currentLiquidityRate = liquidityRate;
+    reserve.currentStableBorrowRate = liquidityStableRate;
+    reserve.currentVariableBorrowRate = liquidityVariableRate;
+
+    emit ReserveDataUpdated(
+      reserveAddress,
+      liquidityRate,
+      liquidityStableRate,
+      liquidityVariableRate,
+      reserve.liquidityIndex,
+      reserve.variableBorrowIndex
+    );
+  }
+
+  function updateProjectBorrower(
+    DataTypes.ReserveData storage reserve,
+    address asset,
+    address borrower
+    ) internal {
+      reserve.projectBorrower = borrower;
+  }
+
   struct MintToTreasuryLocalVars {
     uint256 currentStableDebt;
     uint256 principalStableDebt;

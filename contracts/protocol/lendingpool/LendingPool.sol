@@ -8,6 +8,7 @@ import {SafeERC20} from '../../dependencies/openzeppelin/contracts/SafeERC20.sol
 import {Address} from '../../dependencies/openzeppelin/contracts/Address.sol';
 import {ILendingPoolAddressesProvider} from '../../interfaces/ILendingPoolAddressesProvider.sol';
 import {IAToken} from '../../interfaces/IAToken.sol';
+import {IBToken} from '../../interfaces/IBToken.sol';
 import {IVariableDebtToken} from '../../interfaces/IVariableDebtToken.sol';
 import {IFlashLoanReceiver} from '../../flashloan/interfaces/IFlashLoanReceiver.sol';
 import {IPriceOracleGetter} from '../../interfaces/IPriceOracleGetter.sol';
@@ -75,7 +76,7 @@ contract LendingPool is VersionedInitializable, ILendingPool, LendingPoolStorage
   function getRevision() internal pure override returns (uint256) {
     return LENDINGPOOL_REVISION;
   }
-
+  // OK
   /**
    * @dev Function is invoked by the proxy contract when the LendingPool contract is added to the
    * LendingPoolAddressesProvider of the market.
@@ -89,7 +90,7 @@ contract LendingPool is VersionedInitializable, ILendingPool, LendingPoolStorage
     _flashLoanPremiumTotal = 9;
     _maxNumberOfReserves = 128;
   }
-
+  // OK
   /**
    * @dev Deposits an `amount` of underlying asset into the reserve, receiving in return overlying aTokens.
    * - E.g. User deposits 100 USDC and gets in return 100 aUSDC
@@ -111,23 +112,22 @@ contract LendingPool is VersionedInitializable, ILendingPool, LendingPoolStorage
 
     ValidationLogic.validateDeposit(reserve, amount);
 
+    // track deposited amount
     address aToken = reserve.aTokenAddress;
 
+    // track interrest
+    address bToken = reserve.bTokenAddress;
+
     reserve.updateState();
-    reserve.updateInterestRates(asset, aToken, amount, 0);
 
     IERC20(asset).safeTransferFrom(msg.sender, aToken, amount);
 
-    bool isFirstDeposit = IAToken(aToken).mint(onBehalfOf, amount, reserve.liquidityIndex);
-
-    if (isFirstDeposit) {
-      _usersConfig[onBehalfOf].setUsingAsCollateral(reserve.id, true);
-      emit ReserveUsedAsCollateralEnabled(asset, onBehalfOf);
-    }
+    bool isFirstDeposit = IAToken(aToken).mint(onBehalfOf, 1, reserve.liquidityIndex);
+    IBToken(bToken).mint(onBehalfOf, amount, reserve.liquidityIndex);
 
     emit Deposit(asset, msg.sender, onBehalfOf, amount, referralCode);
   }
-
+  // ALMOST OK -- NEED TO CHECK PRICE ORACLE
   /**
    * @dev Withdraws an `amount` of underlying asset from the reserve, burning the equivalent aTokens owned
    * E.g. User has 100 aUSDC, calls withdraw() and receives 100 USDC, burning the 100 aUSDC
@@ -169,13 +169,6 @@ contract LendingPool is VersionedInitializable, ILendingPool, LendingPoolStorage
 
     reserve.updateState();
 
-    reserve.updateInterestRates(asset, aToken, 0, amountToWithdraw);
-
-    if (amountToWithdraw == userBalance) {
-      _usersConfig[msg.sender].setUsingAsCollateral(reserve.id, false);
-      emit ReserveUsedAsCollateralDisabled(asset, msg.sender);
-    }
-
     IAToken(aToken).burn(msg.sender, to, amountToWithdraw, reserve.liquidityIndex);
 
     emit Withdraw(asset, msg.sender, to, amountToWithdraw);
@@ -191,9 +184,6 @@ contract LendingPool is VersionedInitializable, ILendingPool, LendingPoolStorage
    *   and 100 stable/variable debt tokens, depending on the `interestRateMode`
    * @param asset The address of the underlying asset to borrow
    * @param amount The amount to be borrowed
-   * @param interestRateMode The interest rate mode at which the user wants to borrow: 1 for Stable, 2 for Variable
-   * @param referralCode Code used to register the integrator originating the operation, for potential rewards.
-   *   0 if the action is executed directly by the user, without any middle-man
    * @param onBehalfOf Address of the user who will receive the debt. Should be the address of the borrower itself
    * calling the function if he wants to borrow against his own collateral, or the address of the credit delegator
    * if he has been given credit delegation allowance
@@ -201,11 +191,11 @@ contract LendingPool is VersionedInitializable, ILendingPool, LendingPoolStorage
   function borrow(
     address asset,
     uint256 amount,
-    uint256 interestRateMode,
-    uint16 referralCode,
     address onBehalfOf
   ) external override whenNotPaused {
     DataTypes.ReserveData storage reserve = _reserves[asset];
+
+    // Interest Rate mode allways STABLE for project reserves
 
     _executeBorrow(
       ExecuteBorrowParams(
@@ -213,14 +203,13 @@ contract LendingPool is VersionedInitializable, ILendingPool, LendingPoolStorage
         msg.sender,
         onBehalfOf,
         amount,
-        interestRateMode,
+        1,
         reserve.aTokenAddress,
-        referralCode,
         true
       )
     );
   }
-
+  // OK
   /**
    * @notice Repays a borrowed `amount` on a specific reserve, burning the equivalent debt tokens owned
    * - E.g. User repays 100 USDC, burning 100 variable/stable debt tokens of the `onBehalfOf` address
@@ -242,8 +231,8 @@ contract LendingPool is VersionedInitializable, ILendingPool, LendingPoolStorage
     DataTypes.ReserveData storage reserve = _reserves[asset];
 
     (uint256 stableDebt, uint256 variableDebt) = Helpers.getUserCurrentDebt(onBehalfOf, reserve);
-
-    DataTypes.InterestRateMode interestRateMode = DataTypes.InterestRateMode(rateMode);
+    // Interest Rate mode allways STABLE for project reserves
+    DataTypes.InterestRateMode interestRateMode = DataTypes.InterestRateMode(1);
 
     ValidationLogic.validateRepay(
       reserve,
@@ -274,7 +263,10 @@ contract LendingPool is VersionedInitializable, ILendingPool, LendingPoolStorage
     }
 
     address aToken = reserve.aTokenAddress;
-    reserve.updateInterestRates(asset, aToken, paybackAmount, 0);
+
+    // not necesary when the reserve is for a project
+    // projects has fixed interest rates
+    // reserve.updateInterestRates(asset, aToken, paybackAmount, 0);
 
     if (stableDebt.add(variableDebt).sub(paybackAmount) == 0) {
       _usersConfig[onBehalfOf].setBorrowing(reserve.id, false);
@@ -289,280 +281,7 @@ contract LendingPool is VersionedInitializable, ILendingPool, LendingPoolStorage
     return paybackAmount;
   }
 
-  /**
-   * @dev Allows a borrower to swap his debt between stable and variable mode, or viceversa
-   * @param asset The address of the underlying asset borrowed
-   * @param rateMode The rate mode that the user wants to swap to
-   **/
-  function swapBorrowRateMode(address asset, uint256 rateMode) external override whenNotPaused {
-    DataTypes.ReserveData storage reserve = _reserves[asset];
-
-    (uint256 stableDebt, uint256 variableDebt) = Helpers.getUserCurrentDebt(msg.sender, reserve);
-
-    DataTypes.InterestRateMode interestRateMode = DataTypes.InterestRateMode(rateMode);
-
-    ValidationLogic.validateSwapRateMode(
-      reserve,
-      _usersConfig[msg.sender],
-      stableDebt,
-      variableDebt,
-      interestRateMode
-    );
-
-    reserve.updateState();
-
-    if (interestRateMode == DataTypes.InterestRateMode.STABLE) {
-      IStableDebtToken(reserve.stableDebtTokenAddress).burn(msg.sender, stableDebt);
-      IVariableDebtToken(reserve.variableDebtTokenAddress).mint(
-        msg.sender,
-        msg.sender,
-        stableDebt,
-        reserve.variableBorrowIndex
-      );
-    } else {
-      IVariableDebtToken(reserve.variableDebtTokenAddress).burn(
-        msg.sender,
-        variableDebt,
-        reserve.variableBorrowIndex
-      );
-      IStableDebtToken(reserve.stableDebtTokenAddress).mint(
-        msg.sender,
-        msg.sender,
-        variableDebt,
-        reserve.currentStableBorrowRate
-      );
-    }
-
-    reserve.updateInterestRates(asset, reserve.aTokenAddress, 0, 0);
-
-    emit Swap(asset, msg.sender, rateMode);
-  }
-
-  /**
-   * @dev Rebalances the stable interest rate of a user to the current stable rate defined on the reserve.
-   * - Users can be rebalanced if the following conditions are satisfied:
-   *     1. Usage ratio is above 95%
-   *     2. the current deposit APY is below REBALANCE_UP_THRESHOLD * maxVariableBorrowRate, which means that too much has been
-   *        borrowed at a stable rate and depositors are not earning enough
-   * @param asset The address of the underlying asset borrowed
-   * @param user The address of the user to be rebalanced
-   **/
-  function rebalanceStableBorrowRate(address asset, address user) external override whenNotPaused {
-    DataTypes.ReserveData storage reserve = _reserves[asset];
-
-    IERC20 stableDebtToken = IERC20(reserve.stableDebtTokenAddress);
-    IERC20 variableDebtToken = IERC20(reserve.variableDebtTokenAddress);
-    address aTokenAddress = reserve.aTokenAddress;
-
-    uint256 stableDebt = IERC20(stableDebtToken).balanceOf(user);
-
-    ValidationLogic.validateRebalanceStableBorrowRate(
-      reserve,
-      asset,
-      stableDebtToken,
-      variableDebtToken,
-      aTokenAddress
-    );
-
-    reserve.updateState();
-
-    IStableDebtToken(address(stableDebtToken)).burn(user, stableDebt);
-    IStableDebtToken(address(stableDebtToken)).mint(
-      user,
-      user,
-      stableDebt,
-      reserve.currentStableBorrowRate
-    );
-
-    reserve.updateInterestRates(asset, aTokenAddress, 0, 0);
-
-    emit RebalanceStableBorrowRate(asset, user);
-  }
-
-  /**
-   * @dev Allows depositors to enable/disable a specific deposited asset as collateral
-   * @param asset The address of the underlying asset deposited
-   * @param useAsCollateral `true` if the user wants to use the deposit as collateral, `false` otherwise
-   **/
-  function setUserUseReserveAsCollateral(address asset, bool useAsCollateral)
-    external
-    override
-    whenNotPaused
-  {
-    DataTypes.ReserveData storage reserve = _reserves[asset];
-
-    ValidationLogic.validateSetUseReserveAsCollateral(
-      reserve,
-      asset,
-      useAsCollateral,
-      _reserves,
-      _usersConfig[msg.sender],
-      _reservesList,
-      _reservesCount,
-      _addressesProvider.getPriceOracle()
-    );
-
-    _usersConfig[msg.sender].setUsingAsCollateral(reserve.id, useAsCollateral);
-
-    if (useAsCollateral) {
-      emit ReserveUsedAsCollateralEnabled(asset, msg.sender);
-    } else {
-      emit ReserveUsedAsCollateralDisabled(asset, msg.sender);
-    }
-  }
-
-  /**
-   * @dev Function to liquidate a non-healthy position collateral-wise, with Health Factor below 1
-   * - The caller (liquidator) covers `debtToCover` amount of debt of the user getting liquidated, and receives
-   *   a proportionally amount of the `collateralAsset` plus a bonus to cover market risk
-   * @param collateralAsset The address of the underlying asset used as collateral, to receive as result of the liquidation
-   * @param debtAsset The address of the underlying borrowed asset to be repaid with the liquidation
-   * @param user The address of the borrower getting liquidated
-   * @param debtToCover The debt amount of borrowed `asset` the liquidator wants to cover
-   * @param receiveAToken `true` if the liquidators wants to receive the collateral aTokens, `false` if he wants
-   * to receive the underlying collateral asset directly
-   **/
-  function liquidationCall(
-    address collateralAsset,
-    address debtAsset,
-    address user,
-    uint256 debtToCover,
-    bool receiveAToken
-  ) external override whenNotPaused {
-    address collateralManager = _addressesProvider.getLendingPoolCollateralManager();
-
-    //solium-disable-next-line
-    (bool success, bytes memory result) =
-      collateralManager.delegatecall(
-        abi.encodeWithSignature(
-          'liquidationCall(address,address,address,uint256,bool)',
-          collateralAsset,
-          debtAsset,
-          user,
-          debtToCover,
-          receiveAToken
-        )
-      );
-
-    require(success, Errors.LP_LIQUIDATION_CALL_FAILED);
-
-    (uint256 returnCode, string memory returnMessage) = abi.decode(result, (uint256, string));
-
-    require(returnCode == 0, string(abi.encodePacked(returnMessage)));
-  }
-
-  struct FlashLoanLocalVars {
-    IFlashLoanReceiver receiver;
-    address oracle;
-    uint256 i;
-    address currentAsset;
-    address currentATokenAddress;
-    uint256 currentAmount;
-    uint256 currentPremium;
-    uint256 currentAmountPlusPremium;
-    address debtToken;
-  }
-
-  /**
-   * @dev Allows smartcontracts to access the liquidity of the pool within one transaction,
-   * as long as the amount taken plus a fee is returned.
-   * IMPORTANT There are security concerns for developers of flashloan receiver contracts that must be kept into consideration.
-   * For further details please visit https://developers.aave.com
-   * @param receiverAddress The address of the contract receiving the funds, implementing the IFlashLoanReceiver interface
-   * @param assets The addresses of the assets being flash-borrowed
-   * @param amounts The amounts amounts being flash-borrowed
-   * @param modes Types of the debt to open if the flash loan is not returned:
-   *   0 -> Don't open any debt, just revert if funds can't be transferred from the receiver
-   *   1 -> Open debt at stable rate for the value of the amount flash-borrowed to the `onBehalfOf` address
-   *   2 -> Open debt at variable rate for the value of the amount flash-borrowed to the `onBehalfOf` address
-   * @param onBehalfOf The address  that will receive the debt in the case of using on `modes` 1 or 2
-   * @param params Variadic packed params to pass to the receiver as extra information
-   * @param referralCode Code used to register the integrator originating the operation, for potential rewards.
-   *   0 if the action is executed directly by the user, without any middle-man
-   **/
-  function flashLoan(
-    address receiverAddress,
-    address[] calldata assets,
-    uint256[] calldata amounts,
-    uint256[] calldata modes,
-    address onBehalfOf,
-    bytes calldata params,
-    uint16 referralCode
-  ) external override whenNotPaused {
-    FlashLoanLocalVars memory vars;
-
-    ValidationLogic.validateFlashloan(assets, amounts);
-
-    address[] memory aTokenAddresses = new address[](assets.length);
-    uint256[] memory premiums = new uint256[](assets.length);
-
-    vars.receiver = IFlashLoanReceiver(receiverAddress);
-
-    for (vars.i = 0; vars.i < assets.length; vars.i++) {
-      aTokenAddresses[vars.i] = _reserves[assets[vars.i]].aTokenAddress;
-
-      premiums[vars.i] = amounts[vars.i].mul(_flashLoanPremiumTotal).div(10000);
-
-      IAToken(aTokenAddresses[vars.i]).transferUnderlyingTo(receiverAddress, amounts[vars.i]);
-    }
-
-    require(
-      vars.receiver.executeOperation(assets, amounts, premiums, msg.sender, params),
-      Errors.LP_INVALID_FLASH_LOAN_EXECUTOR_RETURN
-    );
-
-    for (vars.i = 0; vars.i < assets.length; vars.i++) {
-      vars.currentAsset = assets[vars.i];
-      vars.currentAmount = amounts[vars.i];
-      vars.currentPremium = premiums[vars.i];
-      vars.currentATokenAddress = aTokenAddresses[vars.i];
-      vars.currentAmountPlusPremium = vars.currentAmount.add(vars.currentPremium);
-
-      if (DataTypes.InterestRateMode(modes[vars.i]) == DataTypes.InterestRateMode.NONE) {
-        _reserves[vars.currentAsset].updateState();
-        _reserves[vars.currentAsset].cumulateToLiquidityIndex(
-          IERC20(vars.currentATokenAddress).totalSupply(),
-          vars.currentPremium
-        );
-        _reserves[vars.currentAsset].updateInterestRates(
-          vars.currentAsset,
-          vars.currentATokenAddress,
-          vars.currentAmountPlusPremium,
-          0
-        );
-
-        IERC20(vars.currentAsset).safeTransferFrom(
-          receiverAddress,
-          vars.currentATokenAddress,
-          vars.currentAmountPlusPremium
-        );
-      } else {
-        // If the user chose to not return the funds, the system checks if there is enough collateral and
-        // eventually opens a debt position
-        _executeBorrow(
-          ExecuteBorrowParams(
-            vars.currentAsset,
-            msg.sender,
-            onBehalfOf,
-            vars.currentAmount,
-            modes[vars.i],
-            vars.currentATokenAddress,
-            referralCode,
-            false
-          )
-        );
-      }
-      emit FlashLoan(
-        receiverAddress,
-        msg.sender,
-        vars.currentAsset,
-        vars.currentAmount,
-        vars.currentPremium,
-        referralCode
-      );
-    }
-  }
-
+  // OK
   /**
    * @dev Returns the state and configuration of the reserve
    * @param asset The address of the underlying asset of the reserve
@@ -576,7 +295,7 @@ contract LendingPool is VersionedInitializable, ILendingPool, LendingPoolStorage
   {
     return _reserves[asset];
   }
-
+  // ALMOST OK -- NEED TO CHECK PRICE ORACLE
   /**
    * @dev Returns the user account data across all the reserves
    * @param user The address of the user
@@ -623,34 +342,6 @@ contract LendingPool is VersionedInitializable, ILendingPool, LendingPoolStorage
   }
 
   /**
-   * @dev Returns the configuration of the reserve
-   * @param asset The address of the underlying asset of the reserve
-   * @return The configuration of the reserve
-   **/
-  function getConfiguration(address asset)
-    external
-    view
-    override
-    returns (DataTypes.ReserveConfigurationMap memory)
-  {
-    return _reserves[asset].configuration;
-  }
-
-  /**
-   * @dev Returns the configuration of the user across all the reserves
-   * @param user The user address
-   * @return The configuration of the user
-   **/
-  function getUserConfiguration(address user)
-    external
-    view
-    override
-    returns (DataTypes.UserConfigurationMap memory)
-  {
-    return _usersConfig[user];
-  }
-
-  /**
    * @dev Returns the normalized income per unit of asset
    * @param asset The address of the underlying asset of the reserve
    * @return The reserve's normalized income
@@ -679,13 +370,43 @@ contract LendingPool is VersionedInitializable, ILendingPool, LendingPoolStorage
     return _reserves[asset].getNormalizedDebt();
   }
 
+  // OK
+  /**
+   * @dev Returns the configuration of the reserve
+   * @param asset The address of the underlying asset of the reserve
+   * @return The configuration of the reserve
+   **/
+  function getConfiguration(address asset)
+    external
+    view
+    override
+    returns (DataTypes.ReserveConfigurationMap memory)
+  {
+    return _reserves[asset].configuration;
+  }
+  // OK
+  /**
+   * @dev Returns the configuration of the user across all the reserves
+   * @param user The user address
+   * @return The configuration of the user
+   **/
+  function getUserConfiguration(address user)
+    external
+    view
+    override
+    returns (DataTypes.UserConfigurationMap memory)
+  {
+    return _usersConfig[user];
+  }
+
+  // OK
   /**
    * @dev Returns if the LendingPool is paused
    */
   function paused() external view override returns (bool) {
     return _paused;
   }
-
+  // OK
   /**
    * @dev Returns the list of the initialized reserves
    **/
@@ -697,7 +418,7 @@ contract LendingPool is VersionedInitializable, ILendingPool, LendingPoolStorage
     }
     return _activeReserves;
   }
-
+  // OK
   /**
    * @dev Returns the cached LendingPoolAddressesProvider connected to this contract
    **/
@@ -711,65 +432,25 @@ contract LendingPool is VersionedInitializable, ILendingPool, LendingPoolStorage
   function MAX_STABLE_RATE_BORROW_SIZE_PERCENT() public view returns (uint256) {
     return _maxStableRateBorrowSizePercent;
   }
-
-  /**
-   * @dev Returns the fee on flash loans 
-   */
-  function FLASHLOAN_PREMIUM_TOTAL() public view returns (uint256) {
-    return _flashLoanPremiumTotal;
-  }
-
+  // OK
   /**
    * @dev Returns the maximum number of reserves supported to be listed in this LendingPool
    */
   function MAX_NUMBER_RESERVES() public view returns (uint256) {
     return _maxNumberOfReserves;
   }
-
+  // ALMOST OK -- NEED TO CHECK PRICE ORACLE
   /**
    * @dev Validates and finalizes an aToken transfer
    * - Only callable by the overlying aToken of the `asset`
    * @param asset The address of the underlying asset of the aToken
    * @param from The user from which the aTokens are transferred
-   * @param to The user receiving the aTokens
-   * @param amount The amount being transferred/withdrawn
-   * @param balanceFromBefore The aToken balance of the `from` user before the transfer
-   * @param balanceToBefore The aToken balance of the `to` user before the transfer
    */
   function finalizeTransfer(
     address asset,
-    address from,
-    address to,
-    uint256 amount,
-    uint256 balanceFromBefore,
-    uint256 balanceToBefore
+    address from
   ) external override whenNotPaused {
     require(msg.sender == _reserves[asset].aTokenAddress, Errors.LP_CALLER_MUST_BE_AN_ATOKEN);
-
-    ValidationLogic.validateTransfer(
-      from,
-      _reserves,
-      _usersConfig[from],
-      _reservesList,
-      _reservesCount,
-      _addressesProvider.getPriceOracle()
-    );
-
-    uint256 reserveId = _reserves[asset].id;
-
-    if (from != to) {
-      if (balanceFromBefore.sub(amount) == 0) {
-        DataTypes.UserConfigurationMap storage fromConfig = _usersConfig[from];
-        fromConfig.setUsingAsCollateral(reserveId, false);
-        emit ReserveUsedAsCollateralDisabled(asset, from);
-      }
-
-      if (balanceToBefore == 0 && amount != 0) {
-        DataTypes.UserConfigurationMap storage toConfig = _usersConfig[to];
-        toConfig.setUsingAsCollateral(reserveId, true);
-        emit ReserveUsedAsCollateralEnabled(asset, to);
-      }
-    }
   }
 
   /**
@@ -848,7 +529,6 @@ contract LendingPool is VersionedInitializable, ILendingPool, LendingPoolStorage
     uint256 amount;
     uint256 interestRateMode;
     address aTokenAddress;
-    uint16 referralCode;
     bool releaseUnderlying;
   }
 
@@ -863,54 +543,41 @@ contract LendingPool is VersionedInitializable, ILendingPool, LendingPoolStorage
         10**reserve.configuration.getDecimals()
       );
 
-    ValidationLogic.validateBorrow(
+    // need to modify validateBorrow not all the current configuration is needed
+
+    // only reserve benefactor
+    // need to pass the reserve benefactor to reserve configuration or reserve data
+    address projectBorrower = reserve.projectBorrower;
+    address emergencyAdmin = _addressesProvider.getEmergencyAdmin();
+
+    ValidationLogic.validateProjectBorrow(
       vars.asset,
       reserve,
       vars.onBehalfOf,
       vars.amount,
-      amountInETH,
       vars.interestRateMode,
-      _maxStableRateBorrowSizePercent,
-      _reserves,
-      userConfig,
-      _reservesList,
-      _reservesCount,
-      oracle
+      projectBorrower,
+      emergencyAdmin
     );
 
     reserve.updateState();
 
     uint256 currentStableRate = 0;
-
+    // need to modify, only stable rate mode is available for project reserves
     bool isFirstBorrowing = false;
-    if (DataTypes.InterestRateMode(vars.interestRateMode) == DataTypes.InterestRateMode.STABLE) {
-      currentStableRate = reserve.currentStableBorrowRate;
 
-      isFirstBorrowing = IStableDebtToken(reserve.stableDebtTokenAddress).mint(
-        vars.user,
-        vars.onBehalfOf,
-        vars.amount,
-        currentStableRate
-      );
-    } else {
-      isFirstBorrowing = IVariableDebtToken(reserve.variableDebtTokenAddress).mint(
-        vars.user,
-        vars.onBehalfOf,
-        vars.amount,
-        reserve.variableBorrowIndex
-      );
-    }
+    currentStableRate = reserve.currentStableBorrowRate;
+
+    isFirstBorrowing = IStableDebtToken(reserve.stableDebtTokenAddress).mint(
+      vars.user,
+      vars.onBehalfOf,
+      vars.amount,
+      currentStableRate
+    );
 
     if (isFirstBorrowing) {
       userConfig.setBorrowing(reserve.id, true);
     }
-
-    reserve.updateInterestRates(
-      vars.asset,
-      vars.aTokenAddress,
-      0,
-      vars.releaseUnderlying ? vars.amount : 0
-    );
 
     if (vars.releaseUnderlying) {
       IAToken(vars.aTokenAddress).transferUnderlyingTo(vars.user, vars.amount);
@@ -922,10 +589,7 @@ contract LendingPool is VersionedInitializable, ILendingPool, LendingPoolStorage
       vars.onBehalfOf,
       vars.amount,
       vars.interestRateMode,
-      DataTypes.InterestRateMode(vars.interestRateMode) == DataTypes.InterestRateMode.STABLE
-        ? currentStableRate
-        : reserve.currentVariableBorrowRate,
-      vars.referralCode
+      currentStableRate
     );
   }
 
@@ -943,4 +607,30 @@ contract LendingPool is VersionedInitializable, ILendingPool, LendingPoolStorage
       _reservesCount = reservesCount + 1;
     }
   }
+
+  function updateInterestRates(
+    address asset,
+    uint128 newLiquidityRate,
+    uint128 newLiquidityStableRate,
+    uint128 newLiquidityVariableRate
+  ) external override onlyLendingPoolConfigurator {
+
+    DataTypes.ReserveData storage reserve = _reserves[asset];
+
+    reserve.updateProjectInterestRates(asset, newLiquidityRate, newLiquidityStableRate, newLiquidityVariableRate);
+
+    reserve.updateState();
+  }
+
+  function updateProjectBorrower(
+    address asset,
+    address projectBorrower
+    ) external override onlyLendingPoolConfigurator {
+
+      DataTypes.ReserveData storage reserve = _reserves[asset];
+
+      reserve.updateProjectBorrower(asset, projectBorrower);
+
+      reserve.updateState();
+    }
 }
